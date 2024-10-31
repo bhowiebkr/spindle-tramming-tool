@@ -11,6 +11,11 @@ Suggest using virtualenv (include sitepackages aswell for being able to import l
 virtualenv --system-site-packages venv
 ```
 
+After activating the virtual environment for the tool, use pip to install the libraries
+```bash
+pip install -r requirements.txt
+```
+
 Launch linuxcnc, launch the tool. The tool talks to linuxcnc remotly and runs standalone.
 
 Launch the tool by running the shell script after making it executable (cmod +x the shell script)
