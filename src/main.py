@@ -19,7 +19,7 @@ from PySide6.QtWidgets import QPushButton
 from PySide6.QtWidgets import QSlider
 from PySide6.QtWidgets import QSplitter
 from PySide6.QtWidgets import QVBoxLayout
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget, QCheckBox
 from PySide6.QtWidgets import QRadioButton
 from PySide6.QtWidgets import QButtonGroup
 
@@ -106,8 +106,6 @@ class MainWindow(QMainWindow):  # type: ignore
         self.pos = "east"
         self.setWindowTitle("Spindle Tramming Tool")
 
-        
-
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout()
@@ -118,9 +116,11 @@ class MainWindow(QMainWindow):  # type: ignore
         self.radius_line.setText(str(50))
         self.move_feed = FloatLineEdit()
         self.move_feed.setText(str(5000))
+        self.flipflop = QCheckBox()
 
         form.addRow("Radius (mm)", self.radius_line)
         form.addRow("Move Feed (mm/min)", self.move_feed)
+        form.addRow("Flipflop Direction", self.flipflop)
 
         direction_layout = QHBoxLayout()
 
@@ -160,7 +160,9 @@ class MainWindow(QMainWindow):  # type: ignore
         print("Moving")
 
         feed = self.move_feed.text()
-        radius = float(self.radius_line.text())  # Convert radius to float for calculations
+        radius = float(
+            self.radius_line.text()
+        )  # Convert radius to float for calculations
         clockwise_rotation = self.clockwise_radio.isChecked()
         half_rotation = self.half.isChecked()
 
@@ -172,12 +174,17 @@ class MainWindow(QMainWindow):  # type: ignore
         gcode_cmd(f"G1 F{feed}")
 
         # Define initial positions for each direction around (X0, Y0)
-        start_pos = {"east": (radius, 0), "north": (0, radius), "west": (-radius, 0), "south": (0, -radius)}
+        start_pos = {
+            "east": (radius, 0),
+            "north": (0, radius),
+            "west": (-radius, 0),
+            "south": (0, -radius),
+        }
 
         # Get the starting position based on self.pos
         if self.pos in start_pos:
             start_x, start_y = start_pos[self.pos]
-            gcode_cmd(f"G0 X{start_x} Y{start_y}")  # Move to the starting position
+            gcode_cmd(f"G1 X{start_x} Y{start_y}")  # Move to the starting position
 
         # Determine the target endpoint and arc center offset (I, J)
         end_x, end_y, i_offset, j_offset = 0, 0, 0, 0  # Initialize
@@ -257,23 +264,34 @@ class MainWindow(QMainWindow):  # type: ignore
         self.pos = get_final_direction(self.pos, rot, direction)
         print(f"Moved to position: {self.pos}")
 
-
+        if self.flipflop.isChecked():
+            if self.clockwise_radio.isChecked():
+                self.counterclockwise_radio.setChecked(True)
+            else:
+                self.clockwise_radio.setChecked(True)
 
     def load_settings(self) -> None:
         settings = QSettings("spindle-tramming-tool", "SpindleTrammingTool")
         if settings.contains("geometry"):
             self.restoreGeometry(settings.value("geometry"))
 
-        self.clockwise_radio.setChecked(settings.value("clockwise_radio", False, type=bool))
-        self.counterclockwise_radio.setChecked(settings.value("counterclockwise_radio", False, type=bool))
+        self.clockwise_radio.setChecked(
+            settings.value("clockwise_radio", False, type=bool)
+        )
+        self.counterclockwise_radio.setChecked(
+            settings.value("counterclockwise_radio", False, type=bool)
+        )
 
         self.quarter.setChecked(settings.value("quarter", False, type=bool))
         self.half.setChecked(settings.value("half", False, type=bool))
+        self.flipflop.setChecked(settings.value("flipflop", False, type=bool))
 
-
-
-        self.radius_line.setText(settings.value("radius", "50"))  # Default to 50 if not saved
-        self.move_feed.setText(settings.value("feed", "1000"))  # Default to 50 if not saved
+        self.radius_line.setText(
+            settings.value("radius", "50")
+        )  # Default to 50 if not saved
+        self.move_feed.setText(
+            settings.value("feed", "1000")
+        )  # Default to 50 if not saved
 
     def closeEvent(self, event):
         self.save_settings()  # Save settings when the tool closes
@@ -284,14 +302,16 @@ class MainWindow(QMainWindow):  # type: ignore
 
         # Save radio button states
         settings.setValue("clockwise_radio", self.clockwise_radio.isChecked())
-        settings.setValue("counterclockwise_radio", self.counterclockwise_radio.isChecked())
+        settings.setValue(
+            "counterclockwise_radio", self.counterclockwise_radio.isChecked()
+        )
         settings.setValue("quarter", self.quarter.isChecked())
         settings.setValue("half", self.half.isChecked())
+        settings.setValue("flipflop", self.flipflop.isChecked())
 
         # Save radius
         settings.setValue("radius", self.radius_line.text())
         settings.setValue("feed", self.move_feed.text())
-
 
 
 def start() -> None:
