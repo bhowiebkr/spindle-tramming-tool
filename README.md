@@ -7,3 +7,5 @@ is a tool used with linuxcnc to help with tramming na spindle. Use a dial indeca
 Suggest using virtualenv (include sitepackages aswell for being able to import linuxcnc package)
 
 Launch linuxcnc, launch the tool. The tool talks to linuxcnc remotly and runs standalone.
+
+Launch the tool by running the shell script after making it executable (cmod +x the shell script)
