@@ -106,7 +106,7 @@ class MainWindow(QMainWindow):  # type: ignore
         self.pos = "east"
         self.setWindowTitle("Spindle Tramming Tool")
 
-        self.load_settings()
+        
 
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
@@ -154,70 +154,144 @@ class MainWindow(QMainWindow):  # type: ignore
 
         move_btn.clicked.connect(self.move_command)
 
+        self.load_settings()
+
     def move_command(self):
         print("Moving")
 
         feed = self.move_feed.text()
-        radius = self.radius_line.text()
+        radius = float(self.radius_line.text())  # Convert radius to float for calculations
         clockwise_rotation = self.clockwise_radio.isChecked()
         half_rotation = self.half.isChecked()
 
-        if half_rotation:
-            rot = 180
-        else:
-            rot = 90
+        # Determine rotation degrees based on user selection
+        rot = 180 if half_rotation else 90
+        direction = "clockwise" if clockwise_rotation else "counterclockwise"
 
-        if clockwise_rotation:
-            direction = "clockwise"
-        else:
-            direction = "counterclockwise"
-
-        self.pos = get_final_direction(self.pos, rot, direction)
-
+        # Set feed rate
         gcode_cmd(f"G1 F{feed}")
 
-        X = 0
-        Y = 0
+        # Define initial positions for each direction around (X0, Y0)
+        start_pos = {"east": (radius, 0), "north": (0, radius), "west": (-radius, 0), "south": (0, -radius)}
 
+        # Get the starting position based on self.pos
+        if self.pos in start_pos:
+            start_x, start_y = start_pos[self.pos]
+            gcode_cmd(f"G0 X{start_x} Y{start_y}")  # Move to the starting position
+
+        # Determine the target endpoint and arc center offset (I, J)
+        end_x, end_y, i_offset, j_offset = 0, 0, 0, 0  # Initialize
+
+        # Calculate end positions and I/J offsets based on the initial direction and rotation
         if self.pos == "east":
-            X = radius
-            Y = 0
-        elif self.pos == "west":
-            X = -radius
-            Y = 0
+            if direction == "clockwise":
+                if rot == 90:
+                    end_x, end_y = 0, -radius  # Move to south
+                    i_offset, j_offset = -radius, 0
+                elif rot == 180:
+                    end_x, end_y = -radius, 0  # Move to west
+                    i_offset, j_offset = -radius, 0
+            else:  # Counterclockwise
+                if rot == 90:
+                    end_x, end_y = 0, radius  # Move to north
+                    i_offset, j_offset = -radius, 0
+                elif rot == 180:
+                    end_x, end_y = -radius, 0  # Move to west
+                    i_offset, j_offset = -radius, 0
 
         elif self.pos == "north":
-            X = 0
-            Y = radius
+            if direction == "clockwise":
+                if rot == 90:
+                    end_x, end_y = radius, 0  # Move to east
+                    i_offset, j_offset = 0, -radius
+                elif rot == 180:
+                    end_x, end_y = 0, -radius  # Move to south
+                    i_offset, j_offset = 0, -radius
+            else:  # Counterclockwise
+                if rot == 90:
+                    end_x, end_y = -radius, 0  # Move to west
+                    i_offset, j_offset = 0, -radius
+                elif rot == 180:
+                    end_x, end_y = 0, -radius  # Move to south
+                    i_offset, j_offset = 0, -radius
+
+        elif self.pos == "west":
+            if direction == "clockwise":
+                if rot == 90:
+                    end_x, end_y = 0, radius  # Move to north
+                    i_offset, j_offset = radius, 0
+                elif rot == 180:
+                    end_x, end_y = radius, 0  # Move to east
+                    i_offset, j_offset = radius, 0
+            else:  # Counterclockwise
+                if rot == 90:
+                    end_x, end_y = 0, -radius  # Move to south
+                    i_offset, j_offset = radius, 0
+                elif rot == 180:
+                    end_x, end_y = radius, 0  # Move to east
+                    i_offset, j_offset = radius, 0
+
         elif self.pos == "south":
-            X = 0
-            Y = -radius
+            if direction == "clockwise":
+                if rot == 90:
+                    end_x, end_y = -radius, 0  # Move to west
+                    i_offset, j_offset = 0, radius
+                elif rot == 180:
+                    end_x, end_y = 0, radius  # Move to north
+                    i_offset, j_offset = 0, radius
+            else:  # Counterclockwise
+                if rot == 90:
+                    end_x, end_y = radius, 0  # Move to east
+                    i_offset, j_offset = 0, radius
+                elif rot == 180:
+                    end_x, end_y = 0, radius  # Move to north
+                    i_offset, j_offset = 0, radius
 
-        next_pos = get_final_direction(self.pos, rot, direction)
+        # Execute the G-code arc command based on rotation direction
+        if direction == "clockwise":
+            gcode_cmd(f"G2 X{end_x} Y{end_y} I{i_offset} J{j_offset}")
+        else:
+            gcode_cmd(f"G3 X{end_x} Y{end_y} I{i_offset} J{j_offset}")
 
-        if direction == "clockwise" and rot == 180:
+        # Update current position
+        self.pos = get_final_direction(self.pos, rot, direction)
+        print(f"Moved to position: {self.pos}")
 
-            gcode_cmd(f"G1 X {radius}")
 
-            gcode_cmd(f"G03 I-{radius} J0")
 
     def load_settings(self) -> None:
         settings = QSettings("spindle-tramming-tool", "SpindleTrammingTool")
         if settings.contains("geometry"):
             self.restoreGeometry(settings.value("geometry"))
 
-    def closeEvent(self, event: QCloseEvent) -> None:
-        self.settings = QSettings("spindle-tramming-tool", "SpindleTrammingTool")
-        self.settings.setValue("geometry", self.saveGeometry())
+        self.clockwise_radio.setChecked(settings.value("clockwise_radio", False, type=bool))
+        self.counterclockwise_radio.setChecked(settings.value("counterclockwise_radio", False, type=bool))
 
-        # Cleanup the threads
-        # self.core.workerThread.quit()
-        # self.core.workerThread.wait()
+        self.quarter.setChecked(settings.value("quarter", False, type=bool))
+        self.half.setChecked(settings.value("half", False, type=bool))
 
-        # Close the ballbar thread
 
-        self.deleteLater()
+
+        self.radius_line.setText(settings.value("radius", "50"))  # Default to 50 if not saved
+        self.move_feed.setText(settings.value("feed", "1000"))  # Default to 50 if not saved
+
+    def closeEvent(self, event):
+        self.save_settings()  # Save settings when the tool closes
         super().closeEvent(event)
+
+    def save_settings(self):
+        settings = QSettings("spindle-tramming-tool", "SpindleTrammingTool")
+
+        # Save radio button states
+        settings.setValue("clockwise_radio", self.clockwise_radio.isChecked())
+        settings.setValue("counterclockwise_radio", self.counterclockwise_radio.isChecked())
+        settings.setValue("quarter", self.quarter.isChecked())
+        settings.setValue("half", self.half.isChecked())
+
+        # Save radius
+        settings.setValue("radius", self.radius_line.text())
+        settings.setValue("feed", self.move_feed.text())
+
 
 
 def start() -> None:
