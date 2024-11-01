@@ -5,7 +5,7 @@ This is a standalone tool used with linuxcnc (communicates with linuxcnc) to hel
 ![Spindle Tramming Tool GUI](images/spindle_tramming_tool_GUI.png)
 
 Video:
-https://youtu.be/L0tiNUSMYow?si=pLyVhTnOV17T1kwG
+[![Watch the video](https://img.youtube.com/vi/L0tiNUSMYow/hqdefault.jpg)](https://www.youtube.com/embed/L0tiNUSMYow)
 
 ## Install
 
